@@ -104,7 +104,13 @@ extension PanModalPresentable where Self: UIViewController {
             let targetSize = CGSize(width: (presentedVC?.containerView?.bounds ?? UIScreen.main.bounds).width,
                                     height: UIView.layoutFittingCompressedSize.height)
             let intrinsicHeight = view.systemLayoutSizeFitting(targetSize).height
-            return bottomYPos - (intrinsicHeight + bottomLayoutOffset)
+            let bottomInset: CGFloat
+            if #available(iOS 11.0, *) {
+                bottomInset = UIApplication.shared.keyWindow?.safeAreaInsets.bottom ?? 0
+            } else {
+                bottomInset = 0
+            }
+            return bottomYPos - (intrinsicHeight + bottomLayoutOffset) + bottomInset
         }
     }
 
