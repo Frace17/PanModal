@@ -411,7 +411,7 @@ private extension PanModalPresentationController {
     func addDragIndicatorView(to view: UIView) {
         view.addSubview(dragIndicatorView)
         dragIndicatorView.translatesAutoresizingMaskIntoConstraints = false
-        dragIndicatorView.bottomAnchor.constraint(equalTo: view.topAnchor, constant: -Constants.indicatorYOffset).isActive = true
+        dragIndicatorView.topAnchor.constraint(equalTo: view.topAnchor, constant: presentable?.topIndicatorOffset ?? -Constants.indicatorYOffset).isActive = true
         dragIndicatorView.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
         dragIndicatorView.widthAnchor.constraint(equalToConstant: Constants.dragIndicatorSize.width).isActive = true
         dragIndicatorView.heightAnchor.constraint(equalToConstant: Constants.dragIndicatorSize.height).isActive = true
