@@ -17,8 +17,12 @@ public extension PanModalPresentable where Self: UIViewController {
         return topLayoutOffset + 21.0
     }
     
-    var topIndicatorOffset: CGFloat {
+    var dragIndicatorTopOffset: CGFloat {
         return 8
+    }
+    
+    var dragIndicatorSize: CGSize {
+        return PanModalPresentationController.Constants.dragIndicatorSize
     }
 
     var shortFormHeight: PanModalHeight {
