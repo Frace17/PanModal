@@ -36,7 +36,7 @@ public extension PanModalPresentable where Self: UIViewController {
 
         // called once during presentation and stored
         scrollView.layoutIfNeeded()
-        return .contentHeight(scrollView.contentSize.height)
+        return .contentHeight(scrollView.contentInset.top + scrollView.contentSize.height + scrollView.contentInset.bottom)
     }
 
     var cornerRadius: CGFloat {
