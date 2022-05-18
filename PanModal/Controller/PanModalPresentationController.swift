@@ -459,7 +459,6 @@ private extension PanModalPresentationController {
 //         } else {
 //             scrollView.contentInset.bottom = presentingViewController.bottomLayoutGuide.length
 //         }
-        scrollView.contentInset.bottom = presentingViewController.bottomLayoutGuide.length
         
         /**
          As we adjust the bounds during `handleScrollViewTopBounce`

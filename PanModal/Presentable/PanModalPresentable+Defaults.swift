@@ -35,6 +35,7 @@ public extension PanModalPresentable where Self: UIViewController {
             else { return .maxHeight }
 
         // called once during presentation and stored
+        view.layoutIfNeeded()
         scrollView.layoutIfNeeded()
         return .contentHeight(scrollView.contentInset.top + scrollView.contentSize.height + scrollView.contentInset.bottom)
     }
