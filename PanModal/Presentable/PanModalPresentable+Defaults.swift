@@ -78,8 +78,9 @@ public extension PanModalPresentable where Self: UIViewController {
         guard let scrollView = panScrollable
             else { return false }
 
+        view.layoutIfNeeded()
         scrollView.layoutIfNeeded()
-        return scrollView.contentSize.height > (scrollView.frame.height - bottomLayoutOffset)
+        return (scrollView.contentInset.top + scrollView.contentSize.height + scrollView.contentInset.bottom) > (scrollView.frame.height - bottomLayoutOffset)
     }
 
     var allowsDragToDismiss: Bool {
