@@ -146,6 +146,19 @@ open class PanModalPresentationController: UIPresentationController {
         return panContainerView
     }
 
+    /**
+     Full container height, horizontally inside the side safe area (iPhone Duo vertical bar, Split View).
+     The presentation animator applies this frame (`finalFrame(for:)`) after `adjustPresentedViewFrame()` ran,
+     so without this override the sheet goes back to the full container width
+     */
+    public override var frameOfPresentedViewInContainerView: CGRect {
+        guard let containerView = containerView
+            else { return super.frameOfPresentedViewInContainerView }
+
+        let band = containerView.panModalHorizontalFrame
+        return CGRect(x: band.minX, y: 0, width: band.width, height: containerView.bounds.height)
+    }
+
     // MARK: - Gesture Recognizers
 
     /**
@@ -364,12 +377,15 @@ private extension PanModalPresentationController {
      */
     func adjustPresentedViewFrame() {
 
-        guard let frame = containerView?.frame
+        guard let containerView = containerView
             else { return }
 
-        let adjustedSize = CGSize(width: frame.size.width, height: frame.size.height - anchoredYPosition)
+        let frame = containerView.frame
+        // Width and x come from the side safe area (iPhone Duo vertical bar); equal to the container on other iPhones
+        let band = containerView.panModalHorizontalFrame
+        let adjustedSize = CGSize(width: band.width, height: frame.size.height - anchoredYPosition)
         let panFrame = panContainerView.frame
-        panContainerView.frame.size = frame.size
+        panContainerView.frame.size = CGSize(width: band.width, height: frame.size.height)
         
         if ![shortFormYPosition, longFormYPosition].contains(panFrame.origin.y) {
             // if the container is already in the correct position, no need to adjust positioning
@@ -377,7 +393,7 @@ private extension PanModalPresentationController {
             let yPosition = panFrame.origin.y - panFrame.height + frame.height
             presentedView.frame.origin.y = max(yPosition, anchoredYPosition)
         }
-        panContainerView.frame.origin.x = frame.origin.x
+        panContainerView.frame.origin.x = band.minX
         presentedViewController.view.frame = CGRect(origin: .zero, size: adjustedSize)
     }
 
@@ -798,7 +814,8 @@ private extension PanModalPresentationController {
          Decrease the view bounds by the y offset so the scroll view stays in place
          and we can still get updates on its content offset
          */
-        presentedView.bounds.size = CGSize(width: presentedSize.width, height: presentedSize.height + yOffset)
+        // Keep the sheet's own width: the container's would stretch it under the iPhone Duo vertical bar
+        presentedView.bounds.size = CGSize(width: presentedView.bounds.width, height: presentedSize.height + yOffset)
 
         if oldYValue > yOffset {
             /**
@@ -860,7 +877,8 @@ private extension PanModalPresentationController {
           view.layer.mask = maskLayer
         }
         view.layer.shouldRasterize = true
-        view.layer.rasterizationScale = UIScreen.main.scale
+        // UIScreen.main is deprecated; the view's trait collection has the same scale
+        view.layer.rasterizationScale = view.traitCollection.displayScale
          
         if #available(iOS 19.0, *) {
           let subviews = view.subviews
@@ -899,6 +917,16 @@ private extension UIScrollView {
      */
     var isScrolling: Bool {
         return isDragging && !isDecelerating || isTracking
+    }
+}
+
+extension UIView {
+
+    /**
+     Horizontal band a sheet may use: inside the side safe area (iPhone Duo vertical bar, Split View)
+     */
+    var panModalHorizontalFrame: CGRect {
+        return bounds.inset(by: UIEdgeInsets(top: 0, left: safeAreaInsets.left, bottom: 0, right: safeAreaInsets.right))
     }
 }
 #endif

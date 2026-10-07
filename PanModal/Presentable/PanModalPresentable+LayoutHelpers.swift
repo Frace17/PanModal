@@ -101,12 +101,14 @@ extension PanModalPresentable where Self: UIViewController {
             return bottomYPos - height
         case .intrinsicHeight:
             view.layoutIfNeeded()
-            let targetSize = CGSize(width: (presentedVC?.containerView?.bounds ?? UIScreen.main.bounds).width,
+            // Measure at the width the sheet actually gets (inside the side safe area); UIScreen.main is deprecated
+            let targetSize = CGSize(width: presentedVC?.containerView?.panModalHorizontalFrame.width ?? view.bounds.width,
                                     height: UIView.layoutFittingCompressedSize.height)
             let intrinsicHeight = view.systemLayoutSizeFitting(targetSize).height
             let bottomInset: CGFloat
             if #available(iOS 11.0, *) {
-                bottomInset = UIApplication.shared.keyWindow?.safeAreaInsets.bottom ?? 0
+                // keyWindow is deprecated; the full-window container has the same bottom inset
+                bottomInset = presentedVC?.containerView?.safeAreaInsets.bottom ?? 0
             } else {
                 bottomInset = 0
             }
