@@ -183,6 +183,7 @@ open class PanModalPresentationController: UIPresentationController {
     override public func containerViewWillLayoutSubviews() {
         super.containerViewWillLayoutSubviews()
         configureViewLayout()
+        adjustPresentedViewFrameIfBandMoved()
     }
 
     override public func presentationTransitionWillBegin() {
@@ -447,6 +448,24 @@ private extension PanModalPresentationController {
         extendsPanScrolling = layoutPresentable.allowsExtendedPanScrolling
 
         containerView?.isUserInteractionEnabled = layoutPresentable.isUserInteractionEnabled
+    }
+
+    /**
+     iPhone Duo: on unfolding, the vertical bar comes back after the size change (the safe area changes, the size doesn't),
+     so the band `viewWillTransition(to:with:)` applied is stale; adjust again when it moved (not while animating)
+     */
+    func adjustPresentedViewFrameIfBandMoved() {
+        guard
+            let containerView = containerView,
+            !isPresentedViewAnimating,
+            !presentedViewController.isBeingPresented,
+            !presentedViewController.isBeingDismissed
+            else { return }
+
+        let band = containerView.panModalHorizontalFrame
+        guard panContainerView.frame.minX != band.minX || panContainerView.frame.width != band.width
+            else { return }
+        adjustPresentedViewFrame()
     }
 
     /**
