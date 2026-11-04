@@ -243,6 +243,8 @@ open class PanModalPresentationController: UIPresentationController {
     override public func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
 
+        let widthBefore = panContainerView.frame.width
+        let wasLongForm = panContainerView.frame.origin.y == longFormYPosition
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard
                 let self = self,
@@ -253,6 +255,18 @@ open class PanModalPresentationController: UIPresentationController {
             if presentable.shouldRoundTopCorners {
                 self.addRoundedCorners(to: self.presentedView)
             }
+        }, completion: { [weak self] _ in
+            // A size change keeps the sheet's on-screen height, but a new width wraps its content again (iPhone Duo folded or
+            // unfolded): measure it at the new width, as `panModalSetNeedsLayoutUpdate()` does, and keep the current form
+            guard
+                let self = self,
+                self.panContainerView.frame.width != widthBefore,
+                !self.isPresentedViewAnimating,
+                !self.presentedViewController.isBeingDismissed
+                else { return }
+            self.panContainerView.layoutIfNeeded()
+            self.setNeedsLayoutUpdate()
+            self.transition(to: wasLongForm ? .longForm : .shortForm)
         })
     }
 
