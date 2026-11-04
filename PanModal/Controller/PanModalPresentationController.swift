@@ -147,7 +147,7 @@ open class PanModalPresentationController: UIPresentationController {
     }
 
     /**
-     Full container height, horizontally inside the side safe area (iPhone Duo vertical bar, Split View).
+     Full container height, horizontally `panModalHorizontalFrame` (iPhone Duo).
      The presentation animator applies this frame (`finalFrame(for:)`) after `adjustPresentedViewFrame()` ran,
      so without this override the sheet goes back to the full container width
      */
@@ -382,7 +382,7 @@ private extension PanModalPresentationController {
             else { return }
 
         let frame = containerView.frame
-        // Width and x come from the side safe area (iPhone Duo vertical bar); equal to the container on other iPhones
+        // Width and x come from `panModalHorizontalFrame` (iPhone Duo); equal to the container on other iPhones
         let band = containerView.panModalHorizontalFrame
         let adjustedSize = CGSize(width: band.width, height: frame.size.height - anchoredYPosition)
         let panFrame = panContainerView.frame
@@ -833,7 +833,7 @@ private extension PanModalPresentationController {
          Decrease the view bounds by the y offset so the scroll view stays in place
          and we can still get updates on its content offset
          */
-        // Keep the sheet's own width: the container's would stretch it under the iPhone Duo vertical bar
+        // Keep the sheet's own width: on the iPhone Duo inner display it is narrower than the container
         presentedView.bounds.size = CGSize(width: presentedView.bounds.width, height: presentedSize.height + yOffset)
 
         if oldYValue > yOffset {
@@ -900,9 +900,18 @@ private extension PanModalPresentationController {
         view.layer.rasterizationScale = view.traitCollection.displayScale
          
         if #available(iOS 19.0, *) {
-          let subviews = view.subviews
-          view.subviews.forEach { $0.removeFromSuperview() }
-          subviews.forEach { view.addSubview($0) }
+          // Re-adding drops a subview's constraints to `view`: keep the drag indicator (centered by constraints) where it is,
+          // otherwise it ends up in the top-left corner after the presentation and after every size transition
+          let indicator = view.subviews.first { $0 === dragIndicatorView }
+          let subviews = view.subviews.filter { $0 !== indicator }
+          subviews.forEach { $0.removeFromSuperview() }
+          subviews.forEach { subview in
+            if let indicator {
+              view.insertSubview(subview, belowSubview: indicator)
+            } else {
+              view.addSubview(subview)
+            }
+          }
           DispatchQueue.main.async {
             if #available(iOS 11.0, *) {
               view.layer.cornerRadius = radius
@@ -942,10 +951,14 @@ private extension UIScrollView {
 extension UIView {
 
     /**
-     Horizontal band a sheet may use: inside the side safe area (iPhone Duo vertical bar, Split View)
+     Horizontal frame of a sheet, the way the system lays out its own sheets on iPhone Duo (measured on iOS 27.1): in compact width
+     the whole width, under the vertical bar too (the sheet's content keeps its sides from its own safe area); in regular width as wide
+     as the short side minus 8 pt on each side (653 pt on the inner display), centered. Equal to `bounds` on other iPhones
      */
     var panModalHorizontalFrame: CGRect {
-        return bounds.inset(by: UIEdgeInsets(top: 0, left: safeAreaInsets.left, bottom: 0, right: safeAreaInsets.right))
+        guard traitCollection.horizontalSizeClass == .regular else { return bounds }
+        let width = min(bounds.width, bounds.height)
+        return CGRect(x: bounds.midX - width / 2, y: bounds.minY, width: width, height: bounds.height).insetBy(dx: 8, dy: 0)
     }
 }
 #endif
