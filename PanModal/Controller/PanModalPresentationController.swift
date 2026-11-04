@@ -962,23 +962,26 @@ private extension UIScrollView {
 extension UIView {
 
     /**
-     Horizontal frame of a sheet, the way the system lays out its own sheets on iPhone Duo (measured on iOS 27.1): in compact width
-     the whole width, under the vertical bar too (the sheet's content keeps its sides from its own safe area); in regular width as wide
-     as the short side minus 8 pt on each side (653 pt on the inner display), centered; in the book pose on the right half. Equal to
+     Horizontal frame of a sheet, always inside the side safe area (on iPhone Duo a sheet never goes under the vertical bar): in
+     compact width the whole safe area; in regular width as wide as the short side minus 8 pt on each side (653 pt on the inner
+     display), centered like a system sheet; in the book pose the right half, from the fold's center to the safe area. Equal to
      `bounds` on other iPhones
      */
     var panModalHorizontalFrame: CGRect {
-        guard traitCollection.horizontalSizeClass == .regular else { return bounds }
-        // Book pose (an active vertical fold across this view): the right half from the fold's center, like a system sheet placed
-        // `.trailing`. A Split View window (compact) only gets the fold clipped to its edge and never gets here
+        let safe = bounds.inset(by: UIEdgeInsets(top: 0, left: safeAreaInsets.left, bottom: 0, right: safeAreaInsets.right))
+        guard traitCollection.horizontalSizeClass == .regular else { return safe }
+        // Book pose (an active vertical fold across this view): the right half, from the fold's center to the safe area. A Split View
+        // window (compact) only gets the fold clipped to its edge and never gets here
         if #available(iOS 27.1, *),
            let fold = reservedRegions(kind: .division).first(where: {
                $0.isActive && $0.frame.height > $0.frame.width && $0.frame.minX > bounds.minX && $0.frame.maxX < bounds.maxX
            })?.frame {
-            return CGRect(x: fold.midX, y: bounds.minY, width: bounds.maxX - fold.midX, height: bounds.height).insetBy(dx: 8, dy: 0)
+            return CGRect(x: fold.midX, y: bounds.minY, width: safe.maxX - fold.midX, height: bounds.height).insetBy(dx: 8, dy: 0)
         }
         let width = min(bounds.width, bounds.height)
-        return CGRect(x: bounds.midX - width / 2, y: bounds.minY, width: width, height: bounds.height).insetBy(dx: 8, dy: 0)
+        return CGRect(x: bounds.midX - width / 2, y: bounds.minY, width: width, height: bounds.height)
+            .intersection(safe)
+            .insetBy(dx: 8, dy: 0)
     }
 }
 #endif
