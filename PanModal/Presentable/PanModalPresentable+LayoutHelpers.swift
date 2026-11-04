@@ -101,10 +101,15 @@ extension PanModalPresentable where Self: UIViewController {
             return bottomYPos - height
         case .intrinsicHeight:
             view.layoutIfNeeded()
-            // Measure at the width the sheet actually gets (inside the side safe area); UIScreen.main is deprecated
+            // Measure at the width the sheet actually gets (`panModalHorizontalFrame`), and hold that width: otherwise multi-line
+            // labels measure at their natural width (a line short on the iPhone Duo book pose); UIScreen.main is deprecated
             let targetSize = CGSize(width: presentedVC?.containerView?.panModalHorizontalFrame.width ?? view.bounds.width,
                                     height: UIView.layoutFittingCompressedSize.height)
-            let intrinsicHeight = view.systemLayoutSizeFitting(targetSize).height
+            let intrinsicHeight = view.systemLayoutSizeFitting(
+                targetSize,
+                withHorizontalFittingPriority: .required,
+                verticalFittingPriority: .fittingSizeLevel
+            ).height
             let bottomInset: CGFloat
             if #available(iOS 11.0, *) {
                 // keyWindow is deprecated; the full-window container has the same bottom inset
