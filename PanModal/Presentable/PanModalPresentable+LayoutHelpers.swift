@@ -31,7 +31,7 @@ extension PanModalPresentable where Self: UIViewController {
         guard let rootVC = rootViewController
             else { return 0}
 
-        if #available(iOS 11.0, *) { return rootVC.view.safeAreaInsets.top } else { return rootVC.topLayoutGuide.length }
+        return rootVC.view.safeAreaInsets.top
     }
 
     /**
@@ -43,7 +43,7 @@ extension PanModalPresentable where Self: UIViewController {
        guard let rootVC = rootViewController
             else { return 0}
 
-        if #available(iOS 11.0, *) { return rootVC.view.safeAreaInsets.bottom } else { return rootVC.bottomLayoutGuide.length }
+        return rootVC.view.safeAreaInsets.bottom
     }
 
     /**
@@ -110,13 +110,8 @@ extension PanModalPresentable where Self: UIViewController {
                 withHorizontalFittingPriority: .required,
                 verticalFittingPriority: .fittingSizeLevel
             ).height
-            let bottomInset: CGFloat
-            if #available(iOS 11.0, *) {
-                // keyWindow is deprecated; the full-window container has the same bottom inset
-                bottomInset = presentedVC?.containerView?.safeAreaInsets.bottom ?? 0
-            } else {
-                bottomInset = 0
-            }
+            // keyWindow is deprecated; the full-window container has the same bottom inset
+            let bottomInset = presentedVC?.containerView?.safeAreaInsets.bottom ?? 0
             return bottomYPos - (intrinsicHeight + bottomLayoutOffset) + bottomInset
         }
     }
@@ -126,10 +121,7 @@ extension PanModalPresentable where Self: UIViewController {
         guard let application = UIApplication.value(forKeyPath: #keyPath(UIApplication.shared)) as? UIApplication
             else { return nil }
         
-        if #available(iOS 13.0, *) {
-            return application.windows.first?.rootViewController
-        }
-        return application.keyWindow?.rootViewController
+        return application.windows.first?.rootViewController
     }
 
 }

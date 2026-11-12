@@ -263,15 +263,12 @@ open class PanModalPresentationController: UIPresentationController {
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard
                 let self = self,
-                let presentable = self.presentable
+                self.presentable != nil
                 else { return }
 
-            self.adjustPresentedViewFrame()
-            // From iOS 11 on the corners don't depend on the size, and running `addRoundedCorners` again would re-add the sheet's
+            // No `addRoundedCorners` here: the corners don't depend on the size, and running it again would re-add the sheet's
             // views on iOS 26+, which ends text editing (closes the keyboard) and cancels touches on every size change
-            guard #unavailable(iOS 11.0), presentable.shouldRoundTopCorners
-                else { return }
-            self.addRoundedCorners(to: self.presentedView)
+            self.adjustPresentedViewFrame()
         }, completion: { [weak self] _ in
             // A size change keeps the sheet's on-screen height, but a new width wraps its content again (iPhone Duo folded or
             // unfolded, a resizable window): measure it again on the next layout pass and keep the form it had before
@@ -549,9 +546,7 @@ private extension PanModalPresentationController {
          As we adjust the bounds during `handleScrollViewTopBounce`
          we should assume that contentInsetAdjustmentBehavior will not be correct
          */
-        if #available(iOS 11.0, *) {
-            scrollView.contentInsetAdjustmentBehavior = .never
-        }
+        scrollView.contentInsetAdjustmentBehavior = .never
     }
 
 }
@@ -937,18 +932,9 @@ private extension PanModalPresentationController {
      */
     func addRoundedCorners(to view: UIView) {
         let radius = presentable?.cornerRadius ?? 0
-        if #available(iOS 11.0, *) {
-          view.layer.cornerRadius = radius
-          view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-          view.layer.masksToBounds = true
-        } else {
-          let maskPath = UIBezierPath(roundedRect: view.bounds,
-                        byRoundingCorners: [.topLeft, .topRight],
-                        cornerRadii: CGSize(width: radius, height: radius))
-          let maskLayer = CAShapeLayer()
-          maskLayer.path = maskPath.cgPath
-          view.layer.mask = maskLayer
-        }
+        view.layer.cornerRadius = radius
+        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        view.layer.masksToBounds = true
         view.layer.shouldRasterize = true
         // UIScreen.main is deprecated; the view's trait collection has the same scale
         view.layer.rasterizationScale = view.traitCollection.displayScale
@@ -967,10 +953,8 @@ private extension PanModalPresentationController {
             }
           }
           DispatchQueue.main.async {
-            if #available(iOS 11.0, *) {
-              view.layer.cornerRadius = radius
-              view.layer.masksToBounds = true
-            }
+            view.layer.cornerRadius = radius
+            view.layer.masksToBounds = true
           }
         }
       }
@@ -1012,8 +996,6 @@ extension UIView {
      Dynamic Island, and a centered card wherever the width is regular (Plus and Max iPhones in landscape, iPad)
      */
     var panModalHorizontalFrame: CGRect {
-        guard #available(iOS 11.0, *)
-            else { return bounds }
         let safe = bounds.inset(by: UIEdgeInsets(top: 0, left: safeAreaInsets.left, bottom: 0, right: safeAreaInsets.right))
         guard traitCollection.horizontalSizeClass == .regular else { return safe }
         // Book pose (an active vertical fold across this view): the right half, from the fold's center to the safe area. A Split View
