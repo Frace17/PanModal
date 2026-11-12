@@ -267,9 +267,11 @@ open class PanModalPresentationController: UIPresentationController {
                 else { return }
 
             self.adjustPresentedViewFrame()
-            if presentable.shouldRoundTopCorners {
-                self.addRoundedCorners(to: self.presentedView)
-            }
+            // From iOS 11 on the corners don't depend on the size, and running `addRoundedCorners` again would re-add the sheet's
+            // views on iOS 26+, which ends text editing (closes the keyboard) and cancels touches on every size change
+            guard #unavailable(iOS 11.0), presentable.shouldRoundTopCorners
+                else { return }
+            self.addRoundedCorners(to: self.presentedView)
         }, completion: { [weak self] _ in
             // A size change keeps the sheet's on-screen height, but a new width wraps its content again (iPhone Duo folded or
             // unfolded, a resizable window): measure it again on the next layout pass and keep the form it had before
@@ -953,7 +955,7 @@ private extension PanModalPresentationController {
          
         if #available(iOS 19.0, *) {
           // Re-adding drops a subview's constraints to `view`: keep the drag indicator (centered by constraints) where it is,
-          // otherwise it ends up in the top-left corner after the presentation and after every size transition
+          // otherwise it ends up in the top-left corner
           let indicator = view.subviews.first { $0 === dragIndicatorView }
           let subviews = view.subviews.filter { $0 !== indicator }
           subviews.forEach { $0.removeFromSuperview() }
