@@ -50,6 +50,12 @@ open class PanModalPresentationController: UIPresentationController {
     private var isPresentedViewAnimating = false
 
     /**
+     The form to keep when the sheet is measured again on the next layout pass after it stops animating
+     (`adjustToBand(keeping:)`); nil when no re-measure is waiting
+     */
+    private var pendingRemeasure: PresentationState?
+
+    /**
      A flag to determine if scrolling should seamlessly transition
      from the pan modal container view to the scroll view
      once the scroll limit has been reached.
@@ -182,8 +188,10 @@ open class PanModalPresentationController: UIPresentationController {
 
     override public func containerViewWillLayoutSubviews() {
         super.containerViewWillLayoutSubviews()
+        // read the form before `configureViewLayout()` recalculates the positions it is read from
+        let form = pendingRemeasure ?? presentationState
         configureViewLayout()
-        adjustPresentedViewFrameIfBandMoved()
+        adjustToBand(keeping: form)
     }
 
     override public func presentationTransitionWillBegin() {
@@ -207,7 +215,14 @@ open class PanModalPresentationController: UIPresentationController {
     }
 
     override public func presentationTransitionDidEnd(_ completed: Bool) {
-        if completed { return }
+        if completed {
+            // a re-measure that waited for the presentation (`adjustToBand(keeping:)`); the requested layout pass runs after
+            // UIKit has finished the presentation, so `isBeingPresented` is false by then
+            if pendingRemeasure != nil {
+                containerView?.setNeedsLayout()
+            }
+            return
+        }
 
         backgroundView.removeFromSuperview()
     }
@@ -244,7 +259,7 @@ open class PanModalPresentationController: UIPresentationController {
         super.viewWillTransition(to: size, with: coordinator)
 
         let widthBefore = panContainerView.frame.width
-        let wasLongForm = panContainerView.frame.origin.y == longFormYPosition
+        let form = presentationState
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard
                 let self = self,
@@ -257,16 +272,13 @@ open class PanModalPresentationController: UIPresentationController {
             }
         }, completion: { [weak self] _ in
             // A size change keeps the sheet's on-screen height, but a new width wraps its content again (iPhone Duo folded or
-            // unfolded): measure it at the new width, as `panModalSetNeedsLayoutUpdate()` does, and keep the current form
+            // unfolded, a resizable window): measure it again on the next layout pass and keep the form it had before
             guard
                 let self = self,
-                self.panContainerView.frame.width != widthBefore,
-                !self.isPresentedViewAnimating,
-                !self.presentedViewController.isBeingDismissed
+                self.panContainerView.frame.width != widthBefore
                 else { return }
-            self.panContainerView.layoutIfNeeded()
-            self.setNeedsLayoutUpdate()
-            self.transition(to: wasLongForm ? .longForm : .shortForm)
+            self.pendingRemeasure = self.pendingRemeasure ?? form
+            self.containerView?.setNeedsLayout()
         })
     }
 
@@ -396,7 +408,7 @@ private extension PanModalPresentationController {
             else { return }
 
         let frame = containerView.frame
-        // Width and x come from `panModalHorizontalFrame` (iPhone Duo); equal to the container on other iPhones
+        // Width and x come from `panModalHorizontalFrame` (iPhone Duo, side safe areas, regular width)
         let band = containerView.panModalHorizontalFrame
         let adjustedSize = CGSize(width: band.width, height: frame.size.height - anchoredYPosition)
         let panFrame = panContainerView.frame
@@ -465,32 +477,43 @@ private extension PanModalPresentationController {
     }
 
     /**
-     iPhone Duo: on unfolding, the vertical bar comes back after the size change (the safe area changes, the size doesn't),
-     so the band `viewWillTransition(to:with:)` applied is stale; adjust again when it moved (not while animating)
+     The form the sheet is in, by its position: the nearer of the two (a y position doesn't come back from `frame` exactly)
      */
-    func adjustPresentedViewFrameIfBandMoved() {
+    var presentationState: PresentationState {
+        let yPos = presentedView.frame.minY
+        return abs(yPos - longFormYPosition) <= abs(yPos - shortFormYPosition) ? .longForm : .shortForm
+    }
+
+    /**
+     Keeps the sheet in its band (`panModalHorizontalFrame`). iPhone Duo: the band moves without a size change (the vertical
+     bar comes back after unfolding; the book pose), and after a size change the sheet keeps its on-screen height while its
+     content wraps again at the new width (`viewWillTransition(to:with:)` asks for this pass). When the width changed, the
+     content is measured again, as `panModalSetNeedsLayoutUpdate()` does, and the sheet keeps its form. While the sheet is
+     presented or animating this waits: `presentationTransitionDidEnd(_:)` and `snap(toYPosition:)` ask for another pass
+     */
+    func adjustToBand(keeping form: PresentationState) {
         guard
             let containerView = containerView,
-            !isPresentedViewAnimating,
-            !presentedViewController.isBeingPresented,
             !presentedViewController.isBeingDismissed
             else { return }
 
         let band = containerView.panModalHorizontalFrame
-        guard panContainerView.frame.minX != band.minX || panContainerView.frame.width != band.width
+        let needsRemeasure = pendingRemeasure != nil || panContainerView.frame.width != band.width
+        guard needsRemeasure || panContainerView.frame.minX != band.minX
             else { return }
-        // Book pose: the sheet gets narrower without a size change and its content wraps again; measure it again, as
-        // `panModalSetNeedsLayoutUpdate()` does, and keep the current form
-        if panContainerView.frame.width != band.width {
-            let isLongForm = panContainerView.frame.origin.y == longFormYPosition
-            // the new frame first, so the content is measured with the safe area it gets there
-            adjustPresentedViewFrame()
-            panContainerView.layoutIfNeeded()
-            setNeedsLayoutUpdate()
-            transition(to: isLongForm ? .longForm : .shortForm)
+        guard !isPresentedViewAnimating, !presentedViewController.isBeingPresented else {
+            pendingRemeasure = form
             return
         }
+        pendingRemeasure = nil
+        // the new frame first, so the content is measured with the safe area it gets there
         adjustPresentedViewFrame()
+        guard needsRemeasure
+            else { return }
+        panContainerView.layoutIfNeeded()
+        setNeedsLayoutUpdate()
+        // not `transition(to:)`: a layout change is not a transition the presentable could refuse
+        snap(toYPosition: form == .longForm ? longFormYPosition : shortFormYPosition)
     }
 
     /**
@@ -709,6 +732,10 @@ private extension PanModalPresentationController {
             self?.isPresentedViewAnimating = true
         }, config: presentable) { [weak self] didComplete in
             self?.isPresentedViewAnimating = !didComplete
+            // a re-measure that waited for the animation (`adjustToBand(keeping:)`)
+            if didComplete, self?.pendingRemeasure != nil {
+                self?.containerView?.setNeedsLayout()
+            }
         }
     }
 
@@ -858,7 +885,7 @@ private extension PanModalPresentationController {
          Decrease the view bounds by the y offset so the scroll view stays in place
          and we can still get updates on its content offset
          */
-        // Keep the sheet's own width: on the iPhone Duo inner display it is narrower than the container
+        // Keep the sheet's own width: it can be narrower than the container (`panModalHorizontalFrame`)
         presentedView.bounds.size = CGSize(width: presentedView.bounds.width, height: presentedSize.height + yOffset)
 
         if oldYValue > yOffset {
@@ -979,9 +1006,12 @@ extension UIView {
      Horizontal frame of a sheet, always inside the side safe area (on iPhone Duo a sheet never goes under the vertical bar): in
      compact width the whole safe area; in regular width as wide as the short side minus 8 pt on each side (653 pt on the inner
      display), centered like a system sheet; in the book pose the right half, from the fold's center to the safe area. Equal to
-     `bounds` on other iPhones
+     `bounds` on iPhones in portrait. Elsewhere it is narrower too: in landscape the side insets of an iPhone with a notch or
+     Dynamic Island, and a centered card wherever the width is regular (Plus and Max iPhones in landscape, iPad)
      */
     var panModalHorizontalFrame: CGRect {
+        guard #available(iOS 11.0, *)
+            else { return bounds }
         let safe = bounds.inset(by: UIEdgeInsets(top: 0, left: safeAreaInsets.left, bottom: 0, right: safeAreaInsets.right))
         guard traitCollection.horizontalSizeClass == .regular else { return safe }
         // Book pose (an active vertical fold across this view): the right half, from the fold's center to the safe area. A Split View
