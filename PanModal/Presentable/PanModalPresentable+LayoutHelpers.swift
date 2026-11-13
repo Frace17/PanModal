@@ -31,7 +31,7 @@ extension PanModalPresentable where Self: UIViewController {
         guard let rootVC = rootViewController
             else { return 0}
 
-        if #available(iOS 11.0, *) { return rootVC.view.safeAreaInsets.top } else { return rootVC.topLayoutGuide.length }
+        return rootVC.view.safeAreaInsets.top
     }
 
     /**
@@ -43,7 +43,7 @@ extension PanModalPresentable where Self: UIViewController {
        guard let rootVC = rootViewController
             else { return 0}
 
-        if #available(iOS 11.0, *) { return rootVC.view.safeAreaInsets.bottom } else { return rootVC.bottomLayoutGuide.length }
+        return rootVC.view.safeAreaInsets.bottom
     }
 
     /**
@@ -101,15 +101,17 @@ extension PanModalPresentable where Self: UIViewController {
             return bottomYPos - height
         case .intrinsicHeight:
             view.layoutIfNeeded()
-            let targetSize = CGSize(width: (presentedVC?.containerView?.bounds ?? UIScreen.main.bounds).width,
+            // Measure at the width the sheet actually gets (`panModalHorizontalFrame`), and hold that width: otherwise multi-line
+            // labels measure at their natural width (a line short on the iPhone Duo book pose); UIScreen.main is deprecated
+            let targetSize = CGSize(width: presentedVC?.containerView?.panModalHorizontalFrame.width ?? view.bounds.width,
                                     height: UIView.layoutFittingCompressedSize.height)
-            let intrinsicHeight = view.systemLayoutSizeFitting(targetSize).height
-            let bottomInset: CGFloat
-            if #available(iOS 11.0, *) {
-                bottomInset = UIApplication.shared.keyWindow?.safeAreaInsets.bottom ?? 0
-            } else {
-                bottomInset = 0
-            }
+            let intrinsicHeight = view.systemLayoutSizeFitting(
+                targetSize,
+                withHorizontalFittingPriority: .required,
+                verticalFittingPriority: .fittingSizeLevel
+            ).height
+            // keyWindow is deprecated; the full-window container has the same bottom inset
+            let bottomInset = presentedVC?.containerView?.safeAreaInsets.bottom ?? 0
             return bottomYPos - (intrinsicHeight + bottomLayoutOffset) + bottomInset
         }
     }
@@ -119,10 +121,7 @@ extension PanModalPresentable where Self: UIViewController {
         guard let application = UIApplication.value(forKeyPath: #keyPath(UIApplication.shared)) as? UIApplication
             else { return nil }
         
-        if #available(iOS 13.0, *) {
-            return application.windows.first?.rootViewController
-        }
-        return application.keyWindow?.rootViewController
+        return application.windows.first?.rootViewController
     }
 
 }
